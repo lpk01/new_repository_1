@@ -56,11 +56,7 @@ class HrpAccountGlMoveGroupingRule(models.Model):
     line_name=fields.Boolean(string='Line Name',help='Line Name')
     #分析分配
     analytics_flag=fields.Boolean(string='Analytics',help='Analytics',default=True)
-    #补充信息
-    extra_info_flag=fields.Boolean(string='Extra Info',help='Extra Info',default=True)
-    #相关科目页签
-    related_account_ids = fields.One2many(comodel_name='hrp.account.gl.move.grouping.rule.line',
-                                          inverse_name='rule_id')
+
 
     @api.model
     def create(self,vals):

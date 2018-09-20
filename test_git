@@ -1,0 +1,89 @@
+# -*- coding: utf-8 -*-
+
+from openerp import models, fields, api
+from openerp.tools.translate import _
+from openerp.exceptions import ValidationError, except_orm
+from openerp.tools import float_compare
+import openerp.addons.decimal_precision as dp
+from openerp.exceptions import ValidationError, except_orm
+from openerp.tools.translate import _
+from openerp.exceptions import ValidationError, except_orm
+from openerp.tools.translate import _
+import datetime
+from datetime import datetime,timedelta
+from dateutil.relativedelta import relativedelta
+from openerp import SUPERUSER_ID
+from openerp.osv import osv, expression
+from lxml import etree
+
+#凭证分组规则
+class HrpAccountGlMoveGroupingRule(models.Model):
+
+    _name = "hrp.account.gl.move.grouping.rule"
+    _description = "Hrp Account Gl Move Grouping Rule"
+
+    #规则名称
+    name = fields.Char(string='name',help='name')
+    #会计分类
+    account_class_id = fields.Many2many(comodel_name='hrp.account.class',
+                                        relation='hrp_gl_move_group_rule_account_class_ref',
+                                        string='Account Class',
+                                        help='Account Class')
+    #分类账
+    account_journal_id = fields.Many2one(comodel_name='account.journal',string='Account Journal',help='Account Journal')
+    #公司
+    company_id = fields.Many2one(comodel_name='res.company',string='Company',help='Company',default=lambda self: self.env.user.company_id)
+    #币种
+    currency_id = fields.Many2one(comodel_name='res.currency', string='Currency', help='Currency')
+    #时间
+    time_range = fields.Selection([('by period', 'By Period'), ('by date', 'By Date')],
+                                  string='Time Range', help='Time Range', default='by period')
+    originator_id = fields.Boolean(string='Originator',help='Originator')
+    #有效
+    active = fields.Boolean(string='Active',help='Active',default=True)
+    #摘要
+    abstriact = fields.Boolean(string='Abstriact',help='Abstriact')
+    #-------行合并页签--------#
+    #科目方向
+    account_direction=fields.Boolean(string='Account Direction', help='Account Direction', default=True, readonly=True)
+    # #分类账项目类型(废弃)
+    # journal_item_flag=fields.Boolean(string='Journal Item',help='Journal Item',default=True)
+    #科目
+    account_flag=fields.Boolean(string='Account',help='Account',default=True)
+    #业务伙伴
+    partner_flag=fields.Boolean(string='Partner',help='Partner',default=True)
+    #行摘要
+    line_name=fields.Boolean(string='Line Name',help='Line Name')
+    #分析分配
+    analytics_flag=fields.Boolean(string='Analytics',help='Analytics',default=True)
+    #补充信息
+    extra_info_flag=fields.Boolean(string='Extra Info',help='Extra Info',default=True)
+    #相关科目页签
+    related_account_ids = fields.One2many(comodel_name='hrp.account.gl.move.grouping.rule.line',
+                                          inverse_name='rule_id')
+
+    @api.model
+    def create(self,vals):
+        return super(HrpAccountGlMoveGroupingRule,self).create(vals)
+
+    @api.one
+    @api.constrains('account_class_id', 'company_id','account_journal_id')
+    def constrains_group_rule(self):
+        for account_class_id in self.account_class_id.ids:
+            self.env.cr.execute("""SELECT
+                                    ggr."id"
+                                FROM
+                                    hrp_account_gl_move_grouping_rule ggr,
+                                    hrp_gl_move_group_rule_account_class_ref ggrf
+                                WHERE 1=1
+                                AND	ggr. ID = ggrf.hrp_account_gl_move_grouping_rule_id
+                                AND ggr.account_journal_id={journal_id}
+                                AND ggr.company_id = {company_id}
+                                AND ggrf.hrp_account_class_id = {account_class_id}
+                                AND ggr.active = True""".format(
+                                journal_id=self.account_journal_id.id,
+                                company_id=self.company_id.id,
+                                account_class_id=account_class_id))
+            result = self.env.cr.dictfetchall()
+            if len(result)>1:
+                raise ValidationError(_("gl account entry grouping rule can't be duplicate"))
